@@ -3,6 +3,8 @@
 # Set the has_failed variable to false. This will change if any of the subsequent database backups/uploads fail.
 has_failed=false
 
+TARGET_DATABASE_PASSWORD=$(aws kms decrypt --ciphertext-blob fileb://<(echo $DATABASE_PASSWORD_ENCRYPTED | base64 -d) --output text --query Plaintext | base64 -d)
+
 # Create the GCloud Authentication file if set
 if [ ! -z "$GCP_GCLOUD_AUTH" ]
 then
@@ -36,7 +38,7 @@ do
                 echo -e "Database backup failed to upload for $CURRENT_DATABASE at $(date +'%d-%m-%Y %H:%M:%S'). Error: $awsoutput" | tee -a /tmp/kubernetes-s3-mysql-backup.log
                 has_failed=true
             fi
-    
+
         fi
 
         # If the Backup Provider is GCP, then upload to GCS
@@ -51,8 +53,8 @@ do
                 echo -e "Database backup failed to upload for $CURRENT_DATABASE at $(date +'%d-%m-%Y %H:%M:%S'). Error: $gcpoutput" | tee -a /tmp/kubernetes-s3-mysql-backup.log
                 has_failed=true
             fi
-    
-        fi        
+
+        fi
 
     else
         echo -e "Database backup FAILED for $CURRENT_DATABASE at $(date +'%d-%m-%Y %H:%M:%S'). Error: $sqloutput" | tee -a /tmp/kubernetes-s3-mysql-backup.log
@@ -77,7 +79,7 @@ then
         logcontents=`cat /tmp/kubernetes-s3-mysql-backup.log`
 
         # Send Slack alert
-        /slack-alert.sh "One or more backups on database host $TARGET_DATABASE_HOST failed. The error details are included below:" "$logcontents"
+        /slack-alert.sh "One or more backups on database host $TENANT_DOMAIN failed. The error details are included below:" "$logcontents"
     fi
 
     echo -e "kubernetes-s3-mysql-backup encountered 1 or more errors. Exiting with status code 1."
@@ -88,7 +90,7 @@ else
     # If Slack alerts are enabled, send a notification that all database backups were successful
     if [ "$SLACK_ENABLED" = "true" ]
     then
-        /slack-alert.sh "All database backups successfully completed on database host $TARGET_DATABASE_HOST."
+        /slack-alert.sh "All database backups successfully completed on database host $TENANT_DOMAIN."
     fi
 
     exit 0
